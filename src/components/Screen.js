@@ -1,4 +1,5 @@
 
+import { withTheme } from '@emotion/react'
 import React, {useEffect, useRef, useState} from 'react'
 import Node from './Node'
 
@@ -18,31 +19,29 @@ const Screen = (props) => {
     const [destination, setDestination] = useState(new MyNode({id: -1}))
     const [explorer, setExplorer] = useState()
     const [queue,setQueue] = useState([])
-    const [travelNodes, setTravelNode] = useState([])
-    const [sorroundings, setS] = useState([])
     const [pathFound, setPathFound] = useState(false)
     const gettingOrigin = useRef(true)
     const [searching, setSearching] = useState(false)
+    const [buildWall, setBuildWall] = useState(false)
     
 
     useEffect(() => {
             search(false)
-            if(searching)
-                setValue(value => value + 1)
     },[value])
     
-    const search = async (init) => {
-        let soroundings = [explorer.getTop(), explorer.getRight(), explorer.getLeft(), explorer.getBot()]
+    const search = async () => {
+        let soroundings = [explorer.top, explorer.right, explorer.left, explorer.bot]
         let priorDistance = explorer.getDistance()
         let mexplored = queue
 
         for(let i = 0; i < 4; i++){
             try{
-                if(!soroundings[i].getSearched()){ 
+                if(!soroundings[i].isSearched && !soroundings[i].me.isWall){
                     soroundings[i].setDistance(priorDistance)                    
                     if(soroundings[i] == destination){
                         soroundings[i].setParent(explorer)
                         setSearching(false)
+                        getFamily(explorer)
                         return soroundings[i]
                     }
                     if(!soroundings[i].getMe().isWall){
@@ -56,23 +55,22 @@ const Screen = (props) => {
             }
         }
         
-        if(init) {
-        } else {
-            setExplorer( mexplored[0])
-            setQueue(mexplored.slice(1))
-        }
+        
+        setExplorer( mexplored[0])
+        setQueue(mexplored.slice(1))
         setSearching(true)
         setValue(value => value + 1)
         
     }
     
-    const getFamily = (node) => {
-        if(node.getParent()){
-            console.log(node)
-            node.setOrigin(true)
-            console.log(getFamily(node.getParent()))
-        }
-        return 
+    const getFamily =  (node) => {
+        node.setIsPath(true)
+        while(node.parent != origin && !pathFound){
+            getFamily(node.parent)    
+            setValue(value + 1)
+            return 
+        } 
+        setPathFound(true)
     }
      
     const setTravel = (node) => {
@@ -80,7 +78,9 @@ const Screen = (props) => {
         clearMap()
         setQueue([])
         if(gettingOrigin.current){
+            setPathFound(false)
             origin.setOrigin(false)
+            node.setSearched(true)
             setOrigin(node)
             setExplorer(node)
             node.setOrigin(true)
@@ -90,11 +90,16 @@ const Screen = (props) => {
         }
         gettingOrigin.current = !gettingOrigin.current
     }
+    const becomeWall = (node) => {
+        node.me.isWall = true
+        setValue(value => value + 1)
+    }
 
     const clearMap = () => {
         nodes.map((nodeRow) => {
             nodeRow.map((node) => {
                 node.setSearched(false)
+                node.setIsPath(false)
                 node.rebaseDistance()
             })
         })
@@ -104,42 +109,57 @@ const Screen = (props) => {
         return new Promise((resolve) => setTimeout(resolve, time));
     }
 
+    const buttonClass = 'w-24 h-12 bg-emerald-500 m-2'
+
     
     return(
-        <div className='flex justify-center'>
+        <div className='flex justify-center flex-col items-center'>
+            <div className='h-24 flex items-center'>
+                <button onClick={() => setBuildWall(!buildWall)} className={buttonClass}>
+                    Make Wall
+                </button>
+                <button onClick={() => search(true)} className={buttonClass}>
+                    search
+                </button>
+                <button onClick={() => getFamily(destination)} className={buttonClass}>
+                    get Family
+                </button>
+            </div>
             <div className=''>
                 {nodes.map((nodeRow, index) => {
                     return(
                     <div key={index} className='flex flex-row'>
                         {nodeRow.map((node, index) => {
-                            
-                            if(node.getisOrigin()){
+                            if(node.isOrigin){
                                 return (
-                                        <Node node={node} origin={true} cls='w-10 h-10 bg-green-500'/>
+                                        <Node node={node} origin={true} cls='w-4 h-4 bg-green-500 rounded-full'/>
                                 )
                             } 
-                            if (node.isSearched){
-                                return(
-                                        <Node node={node} distance={node.getDistance()} searched={true} setOrigin={() => setTravel(node)} cls=' text-xxs w-10 h-10 bg-pink-100'/>
-                                )
-                            } 
+
                             if (node == destination){
                                 return(
-                                        <Node node={node}  destination={true} cls='w-10 h-10 bg-red-500'/>
+                                        <Node node={node}  destination={true} cls='w-4 h-4 bg-red-500 rounded-full'/>
                                 )
                             }
+
+                            if(node.isPath){
+                                return (
+                                        <Node node={node} origin={true} cls='w-4 h-4 bg-blue-500 '/>
+                                )
+                            } 
+
+                            if (node.isSearched){
+                                return(
+                                        <Node node={node} distance={node.distance} searched={true} click={() => setTravel(node)} cls=' text-xxs w-4 h-4 bg-pink-200 duration-200 scale-75 rounded-lg hover:translate-x-1'/>
+                                )
+                            } 
                             return(
-                                    <Node node={node} origin={node == origin} setOrigin={() => setTravel(node)} cls='w-10 h-10 bg-slate-100'/>
+                                    <Node node={node} origin={node == origin} click={ buildWall ? becomeWall(node)  : () => setTravel(node)} cls='w-4 h-4 bg-slate-100 rounded-md'/>
                             )
                         })}
                     </div>
                     )
                 })}
-                <button onClick={() => search(true)}>search
-                </button>
-                -
-                <button onClick={() => getFamily(destination)}>get Family
-                </button>
             </div>
         </div>
     )
@@ -157,7 +177,7 @@ class MyNode  {
         this.isOrigin = false
         this.isDestination = null
         this.parent = null
-
+        this.isPath = false
     }
 
 
@@ -172,6 +192,7 @@ class MyNode  {
     setSearched(value)      { this.isSearched = value}
     setDistance (value)     { this.distance = this.distance + value}
     setParent(node)         { this.parent = node}
+    setIsPath(value)        { this.isPath = value}
 
     rebaseDistance()        { this.distance = 1}
     getDistance()           { return this.distance}

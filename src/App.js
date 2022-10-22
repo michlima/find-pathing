@@ -4,7 +4,7 @@ import Screen from './components/Screen';
 function App() {
   return (
     <div className="App">
-      <Screen width = {30} height={17}/>
+      <Screen width = {40} height={40}/>
     </div>
   );
 }
