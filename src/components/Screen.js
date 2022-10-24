@@ -13,148 +13,146 @@ const Screen = (props) => {
 
     const WIDTH = props.width
     const HEIGHT = props.height
-    const [value, setValue] = useState(0)
-    const [nodes, setNodes] = useState(initNode(WIDTH, HEIGHT))
-    const [origin, setOrigin] = useState(new MyNode({id: -1}))
-    const [destination, setDestination] = useState(new MyNode({id: -1}))
-    const [explorer, setExplorer] = useState()
-    const [queue,setQueue] = useState([])
+    const [nodes, setNodes]         = useState(initNode(WIDTH, HEIGHT))
     const [pathFound, setPathFound] = useState(false)
-    const gettingOrigin = useRef(true)
-    const [searching, setSearching] = useState(false)
     const [buildWall, setBuildWall] = useState(false)
-    
+    const [mouseDown, setMouseDown] = useState(false)
+    const [value, setValue]         = useState(0)
 
-    useEffect(() => {
-            search(false)
-    },[value])
+    const origin        = useRef(new MyNode({id: -1}))
+    const destination   = useRef(new MyNode({id: -1}))
+    const exporer       = useRef(new MyNode({id: -1}))
+    const queue         = useRef([])
+    const refreshAt     = useRef(4)
+    const searching     = useRef(false)
+    
+    const gettingOrigin = useRef(true)
+    const counter       = useRef(0)
+    
+    
     
     const search = async () => {
-        let soroundings = [explorer.top, explorer.right, explorer.left, explorer.bot]
-        let priorDistance = explorer.getDistance()
-        let mexplored = queue
-
+        let soroundings = [exporer.current.top, exporer.current.right, exporer.current.left, exporer.current.bot]
+        let priorDistance = exporer.current.getDistance()
+        let mexplored = queue.current
         for(let i = 0; i < 4; i++){
             try{
                 if(!soroundings[i].isSearched && !soroundings[i].me.isWall){
                     soroundings[i].setDistance(priorDistance)                    
-                    if(soroundings[i] == destination){
-                        soroundings[i].setParent(explorer)
-                        setSearching(false)
-                        getFamily(explorer)
+                    if(soroundings[i] == destination.current){
+                        soroundings[i].setParent(exporer.current)
+                        searching.current = false
+                        getFamily(exporer.current)
                         return soroundings[i]
                     }
                     if(!soroundings[i].getMe().isWall){
-                        soroundings[i].setParent(explorer)
+                        soroundings[i].setParent(exporer.current)
                         soroundings[i].setSearched(true)
                         mexplored.push(soroundings[i])
                     }
                 }
             } catch (e) {
-                
             }
         }
+
+        console.log(exporer)
         
         
-        setExplorer( mexplored[0])
-        setQueue(mexplored.slice(1))
-        setSearching(true)
-        setValue(value => value + 1)
-        
+        queue.current = mexplored.slice(1)
+        searching.current = true
+        counter.current = counter.current + 1
+        if(searching.current){
+            exporer.current = mexplored[0]
+            await sleep(1).then(() => {
+                search(false)
+            })
+            
+        }
+        if(counter.current > refreshAt.current){
+            refreshAt.current = queue.current.length + 1            
+            counter.current = 0
+            setValue(value => value + 1)
+        }
     }
-    
-    const getFamily =  (node) => {
+
+    const getFamily =  async (node) => {
         node.setIsPath(true)
-        while(node.parent != origin && !pathFound){
+        while(node.parent != origin.current && pathFound){
+            await sleep(50)
             getFamily(node.parent)    
-            setValue(value + 1)
+            setValue(value => value + 1)
             return 
-        } 
+        }
         setPathFound(true)
+    }
+    function sleep (time) {
+        return new Promise((resolve) => setTimeout(resolve, time));
     }
      
     const setTravel = (node) => {
-        setSearching(false)
         clearMap()
-        setQueue([])
+        console.log('traveling')
         if(gettingOrigin.current){
-            setPathFound(false)
-            origin.setOrigin(false)
-            node.setSearched(true)
-            setOrigin(node)
-            setExplorer(node)
+            setPathFound(true)
+            origin.current.setOrigin(false)
+            origin.current = node
+            exporer.current = node
             node.setOrigin(true)
+            setValue(value => value + 1)
         } else {
-            destination.setDestination(false)
-            setDestination(node)
+            destination.current.setDestination(false)
+            destination.current = node
+            setValue(value => value + 1)
         }
         gettingOrigin.current = !gettingOrigin.current
     }
-    const becomeWall = (node) => {
-        node.me.isWall = true
-        setValue(value => value + 1)
-    }
+
 
     const clearMap = () => {
+        queue.current = []
+        searching.current = false
+        setPathFound(true)
         nodes.map((nodeRow) => {
             nodeRow.map((node) => {
                 node.setSearched(false)
                 node.setIsPath(false)
+                node.setParent(false)
                 node.rebaseDistance()
             })
         })
     }
 
-    function sleep (time) {
-        return new Promise((resolve) => setTimeout(resolve, time));
-    }
-
-    const buttonClass = 'w-24 h-12 bg-emerald-500 m-2'
+    const buttonClass = 'm-12 w-24 h-24 hover:scale-125 hover:bg-white hover:text-black duration-200 min-24 h-12 rounded-full border-r-8 border-y-2 text-white' 
 
     
     return(
-        <div className='flex justify-center flex-col items-center'>
-            <div className='h-24 flex items-center'>
-                <button onClick={() => setBuildWall(!buildWall)} className={buttonClass}>
+        <div className='flex justify-center flex-col items-center bg-black  p-12'>
+            <div className=' flex flex-row w-full h-full items-center justify-center '>
+                <button onClick={() => setBuildWall(!buildWall)} className={buildWall ? 'w-24 h-24 bg-white rounded-full m-12 scale-125' : buttonClass}>
                     Make Wall
                 </button>
-                <button onClick={() => search(true)} className={buttonClass}>
+                <button onClick={() => search(true)} 
+                    className={buttonClass}>
                     search
                 </button>
-                <button onClick={() => getFamily(destination)} className={buttonClass}>
-                    get Family
-                </button>
             </div>
-            <div className=''>
+            
+            <div onMouseDown={() => setMouseDown(true)} onMouseUp={() => setMouseDown(false)} className=''>
                 {nodes.map((nodeRow, index) => {
                     return(
                     <div key={index} className='flex flex-row'>
                         {nodeRow.map((node, index) => {
-                            if(node.isOrigin){
-                                return (
-                                        <Node node={node} origin={true} cls='w-4 h-4 bg-green-500 rounded-full'/>
-                                )
-                            } 
-
-                            if (node == destination){
-                                return(
-                                        <Node node={node}  destination={true} cls='w-4 h-4 bg-red-500 rounded-full'/>
-                                )
-                            }
-
-                            if(node.isPath){
-                                return (
-                                        <Node node={node} origin={true} cls='w-4 h-4 bg-blue-500 '/>
-                                )
-                            } 
-
-                            if (node.isSearched){
-                                return(
-                                        <Node node={node} distance={node.distance} searched={true} click={() => setTravel(node)} cls=' text-xxs w-4 h-4 bg-pink-200 duration-200 scale-75 rounded-lg hover:translate-x-1'/>
-                                )
-                            } 
                             return(
-                                    <Node node={node} origin={node == origin} click={ buildWall ? becomeWall(node)  : () => setTravel(node)} cls='w-4 h-4 bg-slate-100 rounded-md'/>
+                                    <Node node={node} click={() => { 
+                                            setTravel(node)
+                                        }} 
+                                        gettingOrigin = {gettingOrigin.current}
+                                        buildingWall = {buildWall}
+                                        mouseDown = {mouseDown}
+                                        pathFound = {pathFound}
+                                        clearMap = {() => clearMap()}
+                                        cls='w-6 h-6 bg-slate-100 rounded-md'
+                                    />
                             )
                         })}
                     </div>
@@ -245,11 +243,12 @@ const assignNodes = (myNodes, width, height) => {
 
 const initNode = (width, height) => {
     let nodeArr = []
+
     for (let i = 0; i < height; i++){
         let nodeRow = []
         for(let j = 0; j < width; j++) {
-            let value = getValue()
-            let newNode = new MyNode({id: (i * width) + j, x:j, y:i , isWall: value})
+            let wall = getValue()
+            let newNode = new MyNode({id: (i * width) + j, x:j, y:i , isWall: wall})
             nodeRow.push(newNode)
         }
         nodeArr.push(nodeRow)
@@ -257,13 +256,13 @@ const initNode = (width, height) => {
     return assignNodes(nodeArr, width, height)
 }
 
-
 const getValue = () => {
-    const x = Math.floor(Math.random() * 3)
-    if(x == 1){
+    const x = Math.floor(Math.random() * 5)
+    if(x == 1 ){
         return true
     }
     return false
 }
+
 
 export default Screen
