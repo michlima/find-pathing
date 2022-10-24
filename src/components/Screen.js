@@ -257,8 +257,8 @@ const initNode = (width, height) => {
 }
 
 const getValue = () => {
-    const x = Math.floor(Math.random() * 5)
-    if(x == 1 ){
+    const x = Math.floor(Math.random() * 9)
+    if(x == 1){
         return true
     }
     return false
